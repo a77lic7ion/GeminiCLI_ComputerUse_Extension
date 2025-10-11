@@ -28,7 +28,7 @@ fi
 
 # 3) Ensure Playwright Chromium is installed for THIS venv
 echo "[computer_use] ensuring Chromium is installed..." >&2
-if ! "$VENV/bin/playwright" install chromium --with-deps --force --no-input -q 1>&2; then
+if ! "$VENV/bin/playwright" install chromium 1>&2; then
   echo "[computer_use] ERROR: playwright chromium install failed" >&2
   exit 1
 fi
