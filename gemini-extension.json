@@ -1,28 +1,12 @@
 {
-  "name": "computer-use",
-  "version": "0.1.0",
-  "mcpServers": [
-    {
-      "id": "computer-use",
-      "transport": "stdio",
-      "cwd": "${extensionDir}",
-      "command": "${extensionDir}${/}servers${/}run.sh",
-      "args": []
+  "name": "ComputerUse",
+  "version": "1.0.0",
+  "mcpServers": {
+    "computerUse": {
+      "command": "bash",
+      "args": ["${extensionPath}${/}servers${/}run.sh"]
     }
-  ],
-  "commands": [
-    { "path": "cu/index.toml" },
-    { "path": "cu/init.toml" },
-    { "path": "cu/open.toml" },
-    { "path": "cu/click.toml" },
-    { "path": "cu/type.toml" },
-    { "path": "cu/scroll.toml" },
-    { "path": "cu/press.toml" },
-    { "path": "cu/js.toml" },
-    { "path": "cu/state.toml" },
-    { "path": "cu/macro.toml" },
-    { "path": "cu/close.toml" }
-  ],
+  },
   "contextFileName": "GEMINI.md",
   "excludeTools": []
 }
