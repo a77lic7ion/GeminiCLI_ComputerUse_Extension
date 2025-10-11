@@ -11,7 +11,7 @@ echo "[computer_use] SERVERS_DIR=$SERVERS_DIR" >&2
 echo "[computer_use] VENV=$VENV" >&2
 
 # 1) Create venv if missing
-if [ ! -x "$VENV/bin/python3" ]; then
+if [ ! -x "$VENV/bin/python" ]; then
   echo "[computer_use] creating venv..." >&2
   "$PYTHON_BIN" -m venv "$VENV" 1>&2
   "$VENV/bin/pip" install -U pip wheel setuptools --disable-pip-version-check -q 1>&2
@@ -35,4 +35,4 @@ fi
 
 # 4) Start MCP server (stdout must remain clean; logs go to stderr)
 echo "[computer_use] starting MCP server..." >&2
-exec "$VENV/bin/python3" "$SERVERS_DIR/computer_use_mcp.py" "$@"
+exec "$VENV/bin/python" "$SERVERS_DIR/computer_use_mcp.py" "$@"
