@@ -1,11 +1,6 @@
-# Gemini API client
-google-genai
-
-# MCP framework
-fastmcp
-
-# Playwright for browser control
-playwright
-
-# Pillow for image handling (used in your template and general utility)
-pillow
+# servers/requirements.txt
+fastmcp>=2.12
+playwright>=1.55
+pillow>=11.0
+mcp>=1.17
+google-genai>=1.40
