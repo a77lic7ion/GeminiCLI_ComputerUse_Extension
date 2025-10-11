@@ -1,0 +1,15 @@
+name = "/cu:init"
+description = "Initialize Playwright browser to a given URL (and viewport)."
+
+prompt = '''
+You have the tools: initialize_browser.
+
+Behavior:
+- Call initialize_browser(url={{url|""}}, width={{width|1440}}, height={{height|900}}).
+- Print the returned URL and viewport.
+
+'''
+[defaults]
+url   = "about:blank"
+width = 1440
+height= 900

@@ -1,0 +1,11 @@
+# Gemini API client
+google-genai
+
+# MCP framework
+fastmcp
+
+# Playwright for browser control
+playwright
+
+# Pillow for image handling (used in your template and general utility)
+pillow

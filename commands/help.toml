@@ -1,0 +1,27 @@
+name = "/cu"
+description = "Computer Use MCP: help & quick usage"
+
+prompt = """
+Computer Use MCP (Playwright)
+-----------------------------
+Tools available:
+• initialize_browser(url, width=1440, height=900)
+• execute_action(action_name, args)    # Supported: open_web_browser, click_at, type_text_at, scroll_to_percent, enter_text_at, select_option_at, drag_and_drop, press_key, execute_javascript
+• capture_state(action_name, result_ok=true, error_msg="")
+• close_browser()
+
+Common commands:
+• /cu:init url="https://example.com"   Initialize browser + open URL
+• /cu:open url="https://..."           Navigate current page
+• /cu:click x=500 y=500                Click at normalized coords (0..1000 scale)
+• /cu:type x=200 y=120 text="hello"    Focus → replace → type; press_enter=true|false
+• /cu:scroll y=700                     Scroll to vertical percent (0..1000)
+• /cu:js code="..."                    Run JS (if implemented)
+• /cu:state prompt="Summarize"         Screenshot → optional Gemini prompt on the image
+• /cu:macro actions='[{"name":"click_at","args":{"x":500,"y":500}}, ...]'
+• /cu:close                            Close browser
+
+Notes:
+- Coordinates are normalized (0..1000) and converted to current viewport pixels.
+- Some actions are stubbed until implemented in your MCP (you’ll see a warning).
+"""

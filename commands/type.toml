@@ -1,0 +1,21 @@
+name = "/cu:type"
+description = "Focus at coords, replace existing text, type provided text, optional Enter."
+
+prompt = '''
+You have the tools: execute_action.
+
+Args:
+- x:int, y:int (0..1000)
+- text:str
+- press_enter:bool
+
+Behavior:
+- Call execute_action("type_text_at", {"x": {{x|500}}, "y": {{y|500}}, "text": {{text|""}}, "press_enter": {{press_enter|false}} }).
+- Print status.
+
+'''
+[defaults]
+x = 500
+y = 500
+text = ""
+press_enter = false
