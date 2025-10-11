@@ -13,6 +13,7 @@ Notes:
 """
 
 import os, sys, time, logging
+from pathlib import Path  # needed by capture_state
 from typing import Optional, Dict, Any, Tuple, List
 from io import BytesIO
 
@@ -28,12 +29,13 @@ log = logging.getLogger("ComputerUseMCP")
 try:
     from mcp.server.fastmcp import FastMCP
 except ImportError:
-    # Assuming fastmcp is installed as a top-level package or in PATH
-    from fastmcp import FastMCP # type: ignore
+    from fastmcp import FastMCP  # type: ignore
 
 # ---------- Playwright Dependencies ----------
 try:
-    from playwright.sync_api import sync_playwright, Playwright, Browser, BrowserContext, Page, TimeoutError
+    from playwright.sync_api import (
+        sync_playwright, Playwright, Browser, BrowserContext, Page, TimeoutError
+    )
     from PIL import Image
 except ImportError as e:
     log.error("Missing dependency: %s (pip install playwright pillow)", e)
@@ -41,7 +43,7 @@ except ImportError as e:
     raise
 
 # Global state for Playwright instance
-_STATE = {
+_STATE: Dict[str, Any] = {
     "playwright": None,     # Playwright handle
     "browser": None,        # Browser handle
     "context": None,        # Context handle
@@ -52,24 +54,32 @@ _STATE = {
 
 # Supported UI Actions (matching the predefined functions from the Computer Use model)
 _SUPPORTED_ACTIONS = [
-    "open_web_browser", "click_at", "type_text_at", 
-    "scroll_to_percent", "enter_text_at", "select_option_at", 
-    "drag_and_drop", "press_key", "execute_javascript"
+    "open_web_browser", "click_at", "type_text_at",
+    "scroll_to_percent", "enter_text_at", "select_option_at",
+    "drag_and_drop", "press_key", "execute_javascript",
 ]
 
-# --- Helper Functions for Coordinate Conversion ---
+# --- Helper Functions ---
 
 def denormalize_x(x: int, screen_width: int) -> int:
-    """Convert normalized x coordinate (0-1000) to actual pixel coordinate."""
-    return int(x / 1000 * screen_width)
+    """Convert normalized x coordinate (0..1000) to actual pixel coordinate."""
+    return int(int(x) / 1000 * screen_width)
 
 def denormalize_y(y: int, screen_height: int) -> int:
-    """Convert normalized y coordinate (0-1000) to actual pixel coordinate."""
-    return int(y / 1000 * screen_height)
+    """Convert normalized y coordinate (0..1000) to actual pixel coordinate."""
+    return int(int(y) / 1000 * screen_height)
 
 def get_page() -> Optional[Page]:
     """Retrieves the current Playwright page, or None if not initialized."""
     return _STATE["page"]
+
+def _await_render(page: Page) -> None:
+    """Wait for page load and a brief moment for rendering."""
+    try:
+        page.wait_for_load_state("networkidle", timeout=5000)
+    except TimeoutError:
+        log.warning("Page load wait timed out.")
+    time.sleep(1)  # small buffer for visual stability
 
 # --- Core Action Handlers ---
 
@@ -80,7 +90,7 @@ def _execute_open_web_browser(args: Dict[str, Any]) -> Dict[str, Any]:
         raise RuntimeError("Browser not initialized.")
     url = args.get("url", "about:blank")
     log.info("Navigating to: %s", url)
-    page.goto(url, timeout=5000)
+    page.goto(url, timeout=15000)
     return {"status": f"Navigated to {page.url}"}
 
 def _execute_click_at(args: Dict[str, Any]) -> Dict[str, Any]:
@@ -88,10 +98,12 @@ def _execute_click_at(args: Dict[str, Any]) -> Dict[str, Any]:
     page = get_page()
     if page is None:
         raise RuntimeError("Browser not initialized.")
-    
+    if "x" not in args or "y" not in args:
+        raise ValueError("click_at requires numeric 'x' and 'y' in 0..1000")
+
     x = denormalize_x(args["x"], _STATE["screen_width"])
     y = denormalize_y(args["y"], _STATE["screen_height"])
-    
+
     log.info("Clicking at: (%d, %d)", x, y)
     page.mouse.click(x, y)
     return {"status": f"Clicked at ({x}, {y})"}
@@ -101,40 +113,28 @@ def _execute_type_text_at(args: Dict[str, Any]) -> Dict[str, Any]:
     page = get_page()
     if page is None:
         raise RuntimeError("Browser not initialized.")
-    
+
+    for k in ("x", "y", "text"):
+        if k not in args:
+            raise ValueError("type_text_at requires 'x','y','text'")
+
     x = denormalize_x(args["x"], _STATE["screen_width"])
     y = denormalize_y(args["y"], _STATE["screen_height"])
-    text = args["text"]
-    press_enter = args.get("press_enter", False)
+    text = str(args["text"])
+    press_enter = bool(args.get("press_enter", False))
 
-    log.info("Typing at (%d, %d): '%s' (enter=%s)", x, y, text, press_enter)
-    
+    log.info("Typing at (%d, %d): %r (enter=%s)", x, y, text, press_enter)
+
     # Click to focus
     page.mouse.click(x, y)
-    # Simple clear (Playwright-recommended way to clear an input)
-    page.keyboard.press("Control+A" if sys.platform != "darwin" else "Meta+A")
-    page.keyboard.press("Delete") # Use Delete instead of Backspace for broader compatibility
-    
+    # Clear then type
+    page.keyboard.press("Meta+A" if sys.platform == "darwin" else "Control+A")
+    page.keyboard.press("Delete")
     page.keyboard.type(text)
     if press_enter:
         page.keyboard.press("Enter")
-        
+
     return {"status": f"Typed text at ({x}, {y}), enter: {press_enter}"}
-
-
-# TODO: Implement other actions for production use cases
-# (scroll_to_percent, enter_text_at, select_option_at, drag_and_drop, press_key, execute_javascript)
-# A simple placeholder is added to handle unimplemented actions gracefully.
-
-
-def _await_render(page: Page):
-    """Wait for page load and a brief moment for rendering."""
-    try:
-        page.wait_for_load_state("networkidle", timeout=5000)
-    except TimeoutError:
-        log.warning("Page load wait timed out.")
-    time.sleep(1) # Extra buffer for visual stability
-
 
 # ---------- MCP server ----------
 mcp = FastMCP("ComputerUse MCP")
@@ -150,32 +150,40 @@ def initialize_browser(url: str, width: int = 1440, height: int = 900) -> Dict[s
     """
     _STATE["screen_width"] = int(width)
     _STATE["screen_height"] = int(height)
-    
+
     if get_page():
         log.warning("Browser already initialized. Closing and re-initializing.")
         close_browser()
 
     try:
-        # 1. Start Playwright
+        # 1) Start Playwright
         _STATE["playwright"] = sync_playwright().start()
-        
-        # 2. Launch browser (headless=False recommended for debugging)
-        _STATE["browser"] = _STATE["playwright"].chromium.launch(headless=False)
-        
-        # 3. Create context and page with specified dimensions
+
+        # 2) Launch browser — headless by default to avoid hidden dialogs
+        headful_env = os.getenv("CU_HEADFUL", "")
+        headless = not (headful_env.strip().lower() in ("1", "true", "yes"))
+        launch_args: Dict[str, Any] = {}
+        if os.getenv("CU_NO_SANDBOX", "").strip().lower() in ("1", "true", "yes"):
+            launch_args["args"] = ["--no-sandbox"]
+
+        _STATE["browser"] = _STATE["playwright"].chromium.launch(
+            headless=headless, **launch_args
+        )
+
+        # 3) Create context and page with specified dimensions
         _STATE["context"] = _STATE["browser"].new_context(
             viewport={"width": _STATE["screen_width"], "height": _STATE["screen_height"]},
-            device_scale_factor=1, # Important for consistent coordinate behavior
+            device_scale_factor=1,  # consistent coordinate behavior
         )
         _STATE["page"] = _STATE["context"].new_page()
 
-        # 4. Navigate to initial page
-        _STATE["page"].goto(url, timeout=10000)
+        # 4) Navigate to initial page
+        _STATE["page"].goto(url, timeout=15000)
         _await_render(_STATE["page"])
-        
+
         log.info("Browser initialized to %s at %dx%d", url, width, height)
         return {
-            "ok": True, 
+            "ok": True,
             "url": _STATE["page"].url,
             "width": _STATE["screen_width"],
             "height": _STATE["screen_height"],
@@ -195,30 +203,37 @@ def execute_action(action_name: str, args: Dict[str, Any]) -> Dict[str, Any]:
     """
     page = get_page()
     if page is None:
-        return {"ok": False, "error": "Browser not initialized. Use /init_computer_use first."}
-    
+        return {"ok": False, "error": "Browser not initialized. Use /cu:init first."}
+
     log.info("Executing action: %s with args: %s", action_name, args)
-    
+
     try:
         result: Dict[str, Any] = {"status": "Action completed successfully."}
-        
+
         if action_name == "open_web_browser":
             result.update(_execute_open_web_browser(args))
         elif action_name == "click_at":
             result.update(_execute_click_at(args))
         elif action_name == "type_text_at":
             result.update(_execute_type_text_at(args))
-        # Add other implemented actions here...
         elif action_name in _SUPPORTED_ACTIONS:
             # Placeholder for unsupported but known actions
-            result = {"status": f"Warning: Action '{action_name}' is supported by the model but not fully implemented in this MCP. Skipping.", "unimplemented": True}
+            result = {
+                "status": (
+                    f"Warning: Action '{action_name}' is supported by the model "
+                    f"but not implemented in this MCP. Skipping."
+                ),
+                "unimplemented": True,
+            }
         else:
-            result = {"status": f"Error: Unknown or unsupported action: {action_name}", "error": True}
-        
+            result = {
+                "status": f"Error: Unknown or unsupported action: {action_name}",
+                "error": True,
+            }
+
         _await_render(page)
-        
         return {"ok": True, "action_name": action_name, "result": result}
-        
+
     except Exception as e:
         log.error("Error executing %s: %s", action_name, e)
         return {"ok": False, "action_name": action_name, "error": str(e), "result": {}}
@@ -235,36 +250,33 @@ def capture_state(action_name: str, result_ok: bool = True, error_msg: str = "")
         return {"ok": False, "error": "Browser not initialized. Cannot capture state."}
 
     try:
-        # Capture screenshot
         screenshot_bytes = page.screenshot(type="png")
-        
-        # Save screenshot to a temporary location
+
         temp_dir = Path("/tmp/gemini_computer_use")
         temp_dir.mkdir(parents=True, exist_ok=True)
         fname = f"{int(time.time() * 1000)}_{action_name}.png"
         fpath = temp_dir / fname
-        
+
         with open(fpath, "wb") as f:
             f.write(screenshot_bytes)
-            
+
         current_url = page.url
-        
-        response_data = {"url": current_url}
+
+        response_data: Dict[str, Any] = {"url": current_url}
         if not result_ok:
             response_data["error"] = error_msg
-        
+
         return {
             "ok": True,
             "path": str(fpath),
             "mime_type": "image/png",
             "url": current_url,
-            "response_data": response_data, # Data to be sent back in FunctionResponse
+            "response_data": response_data,
         }
-        
+
     except Exception as e:
         log.error("Error capturing state: %s", e)
         return {"ok": False, "error": f"State capture failed: {e}"}
-
 
 @mcp.tool()
 def close_browser() -> Dict[str, Any]:
@@ -274,7 +286,6 @@ def close_browser() -> Dict[str, Any]:
             _STATE["browser"].close()
         if _STATE["playwright"]:
             _STATE["playwright"].stop()
-        
         log.info("Browser closed successfully.")
         return {"ok": True}
     except Exception as e:
@@ -283,9 +294,23 @@ def close_browser() -> Dict[str, Any]:
     finally:
         _STATE.update({
             "playwright": None, "browser": None, "context": None, "page": None,
-            "screen_width": 1440, "screen_height": 900
+            "screen_width": 1440, "screen_height": 900,
         })
 
 if __name__ == "__main__":
-    from pathlib import Path
-    mcp.run()
+    try:
+        # TEMPORARY selftest block (uncomment to use):
+        # if os.getenv("CU_SELFTEST") == "1":
+        #     print("Running selftest…", file=sys.stderr)
+        #     print(initialize_browser("https://example.com", 1440, 900), file=sys.stderr)
+        #     print(execute_action("open_web_browser", {"url": "https://duckduckgo.com"}), file=sys.stderr)
+        #     print(execute_action("type_text_at", {"x":220, "y":110, "text":"playwright", "press_enter":True}), file=sys.stderr)
+        #     print(capture_state("selftest", True, ""), file=sys.stderr)
+        #     print(close_browser(), file=sys.stderr)
+        #     sys.exit(0)
+
+        log.info("✅ ComputerUse MCP ready on stdio. PID=%s", os.getpid())
+        mcp.run()
+    except Exception as e:
+        log.exception("MCP server crashed: %s", e)
+        sys.exit(1)
