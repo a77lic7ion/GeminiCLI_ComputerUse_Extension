@@ -1,12 +1,12 @@
 {
-  "name": "ComputerUse",
-  "version": "1.0.0",
-  "mcpServers": {
-    "computerUse": {
-      "command": "bash",
-      "args": ["${extensionPath}${/}servers${/}run.sh"]
-    }
-  },
-  "contextFileName": "GEMINI.md",
-  "excludeTools": []
+"name": "ComputerUse",
+"version": "1.0.0",
+"mcpServers": {
+"computerUse": {
+"command": "bash",
+"args": ["-c", "exec $(cd ~/GeminiCLI_ComputerUse_Extension/servers && pwd)/run.sh"]
+}
+},
+"contextFileName": "GEMINI.md",
+"excludeTools": []
 }
