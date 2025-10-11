@@ -1,8 +1,8 @@
 {
-  "name": "screenshare",
+  "name": "ComputerUse",
   "version": "1.0.0",
   "mcpServers": {
-    "screenshare": {
+    "computerUse": {
       "command": "bash",
       "args": ["${extensionPath}${/}servers${/}run.sh"]
     }
