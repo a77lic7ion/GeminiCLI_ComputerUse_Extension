@@ -6,7 +6,7 @@
       "id": "computer-use",
       "transport": "stdio",
       "cwd": "${extensionDir}",
-      "command": "./servers/run.sh",
+      "command": "${extensionDir}${/}servers${/}run.sh",
       "args": []
     }
   ],
