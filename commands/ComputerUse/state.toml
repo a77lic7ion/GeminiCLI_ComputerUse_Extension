@@ -16,20 +16,21 @@ Steps:
 3) If {{prompt}} provided, run a shell one-liner to call Gemini on the saved image.
 
 !{
-set -euo pipefail
-P="{{path}}"
-PROMPT="{{prompt}}"
-if [ -z "${P}" ]; then
-  echo "No screenshot path returned."
-  exit 0
-fi
+@echo off
+set "P={{path}}"
+set "PROMPT={{prompt}}"
 
-if [ -n "${PROMPT}" ] && [ "${PROMPT}" != "None" ]; then
-  gemini -p "@${P} ${PROMPT}"
-else
-  echo "Screenshot saved at: ${P}"
-  echo "URL: {{url}}"
-fi
+IF "%P%"=="" (
+  echo No screenshot path returned.
+  exit /B 0
+)
+
+IF NOT "%PROMPT%"=="" IF NOT "%PROMPT%"=="None" (
+  gemini -p "@%P% %PROMPT%"
+) ELSE (
+  echo Screenshot saved at: %P%
+  echo URL: {{url}}
+)
 }
 '''
 [defaults]
